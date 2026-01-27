@@ -1,0 +1,44 @@
+# Android
+android/.gradle/
+android/.idea/
+android/local.properties
+android/gradle/wrapper/gradle-wrapper.properties
+android/app/build/
+android/build/
+
+# iOS
+ios/.generated/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Pods/
+ios/.symlinks/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/out/
+
+# VS Code
+.vscode/
+
+# Android Studio
+.idea/
+
+# IntelliJ
+*.iml
+
+# Mac
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Firebase
+**/android/app/google-services.json
+**/ios/Runner/GoogleService-Info.plist
