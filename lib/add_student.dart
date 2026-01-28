@@ -288,7 +288,15 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       }
 
       // Добавляем ученика
-      final price = int.tryParse(_costController.text.trim()) ?? 0;
+      final priceText = _costController.text.trim().replaceAll(' ', '').replaceAll(',', '.');
+      final price = double.tryParse(priceText) ?? 0.0;
+
+      if (price <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Введите корректную цену больше 0')),
+        );
+        return;
+      }
 
       final studentRes = await supabase
           .from('student')

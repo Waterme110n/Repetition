@@ -64,7 +64,8 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
       _nameController.text = studentData['name'] as String;
       _descController.text = studentData['description'] as String? ?? '';
-      _costController.text = (studentData['price_30_min'] as int).toString();
+      final price = studentData['price_30_min'] as num?;
+      _costController.text = price != null ? price.toStringAsFixed(2) : '0.00';
 
       // Загружаем расписание
       final scheduleData = await supabase
@@ -497,19 +498,25 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         return;
       }
 
-      // Обновляем данные ученика
-      final price = int.tryParse(_costController.text.trim()) ?? 0;
+      final priceText = _costController.text
+          .trim()
+          .replaceAll(' ', '')
+          .replaceAll(',', '.');
 
-      await supabase
-          .from('student')
-          .update({
+      final price = double.tryParse(priceText) ?? 0.0;
+
+      if (price <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Введите корректную цену больше 0')),
+        );
+        return;
+      }
+
+      await supabase.from('student').update({
         'name': studentName,
-        'description': _descController.text.trim().isEmpty
-            ? null
-            : _descController.text.trim(),
+        'description': _descController.text.trim().isEmpty ? null : _descController.text.trim(),
         'price_30_min': price,
-      })
-          .eq('id', widget.studentId);
+      }).eq('id', widget.studentId);
 
       // 1. ОБРАБАТЫВАЕМ РАСПИСАНИЕ
       // Собираем ID расписаний, которые остались
@@ -856,12 +863,23 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               TextFormField(
                 controller: _costController,
                 decoration: const InputDecoration(
-                  labelText: 'Цена за пол часа',
+                  labelText: 'Цена за 30 минут',
                   border: OutlineInputBorder(),
                   prefixText: 'BYN ',
                 ),
-                validator: (v) =>
-                v?.trim().isEmpty ?? true ? 'Обязательно' : null,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Обязательно';
+                  }
+                  final cleaned = value.trim().replaceAll(' ', '').replaceAll(',', '.');
+                  final numValue = double.tryParse(cleaned);
+                  if (numValue == null || numValue <= 0) {
+                    return 'Введите корректную цену > 0';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
 

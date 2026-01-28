@@ -53,7 +53,7 @@ class Student {
   final int id;
   final String name;
   final String? description;
-  final int price30Min;
+  final double price30Min;
 
   Student({
     required this.id,
@@ -251,10 +251,8 @@ class _CalendarPageState extends State<CalendarPage> {
     _pageController = PageController(initialPage: _initialPage);
     _timeScrollController = ScrollController();
     _contentScrollController = ScrollController();
-    _fetchWeeklyLessons();
-    _fetchExceptions();
-    _fetchSingleLessons();
-    _fetchStudents();
+
+    _loadEssentialData();
 
     _pageController.addListener(() {
       setState(() {
@@ -269,6 +267,17 @@ class _CalendarPageState extends State<CalendarPage> {
         }
       });
     });
+  }
+
+  Future<void> _loadEssentialData() async {
+    setState(() => _isLoading = true);
+    await _fetchStudents();
+    await Future.wait([
+      _fetchWeeklyLessons(),
+      _fetchSingleLessons(),
+      _fetchExceptions(),
+    ]);
+    setState(() => _isLoading = false);
   }
 
   Future<void> _fetchWeeklyLessons() async {
@@ -343,26 +352,27 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<void> _fetchStudents() async {
     try {
-      final client = Supabase.instance.client;
-      final response = await client
-          .from('student')
-          .select('*');
+      final response = await Supabase.instance.client.from('student').select('*');
+      print('Получено студентов: ${response.length}');
 
-      if (response is List) {
-        final Map<int, Student> studentsMap = {};
-        for (var item in response) {
-          final student = Student.fromJson(item);
-          studentsMap[student.id] = student;
+      final Map<int, Student> map = {};
+      for (var item in response) {
+        try {
+          final s = Student.fromJson(item);
+          map[s.id] = s;
+          print('Добавлен студент: ${s.id} — ${s.name}');
+        } catch (e) {
+          print('Ошибка парсинга студента ${item['id']}: $e');
+          print('Сырые данные: $item');
         }
-
-        setState(() {
-          _studentsMap = studentsMap;
-        });
-
-        print('=== FETCHED ${_studentsMap.length} STUDENTS ===');
       }
+
+      setState(() {
+        _studentsMap = map;
+        print('Всего в карте студентов: ${map.length}');
+      });
     } catch (e) {
-      print('Error fetching students: $e');
+      print('Ошибка загрузки студентов: $e');
     }
   }
 
