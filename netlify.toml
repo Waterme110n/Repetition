@@ -1,8 +1,13 @@
+[build]
+publish = "build/web"
+command = ""  
+
 [[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200
 
-[build]
-publish = "build/web"
-command = "flutter build web"
+[[headers]]
+for = "/*"
+[headers.values]
+Cache-Control = "public, max-age=0, must-revalidate"
