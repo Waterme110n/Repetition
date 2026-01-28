@@ -20,7 +20,6 @@ ios/.symlinks/
 .packages
 .pub-cache/
 .pub/
-/build/
 /out/
 
 # VS Code
