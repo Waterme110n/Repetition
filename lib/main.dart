@@ -415,18 +415,34 @@ class _CalendarPageState extends State<CalendarPage> {
     final dayOfWeek = _getDayOfWeek(date);
     final List<BaseLesson> result = [];
 
-    // 1. Собираем информацию об исключениях
-    final Set<int> cancelledIds = {};
-    final Set<int> movedFromThisDayIds = {};
-    final Map<int, BaseLesson> movedToThisDate = {};
+    // 1. Собираем исключения, которые влияют именно на эту дату
+    final Set<int> cancelledOnThisDate = {};     // scheduleId, отменённые именно на эту дату
+    final Set<int> movedFromThisDay = {};        // scheduleId, которые были перенесены с этой даты
+    final Map<int, BaseLesson> movedToThisDate = {};  // scheduleId → новое занятие на эту дату
 
     for (var exception in _exceptions) {
       if (exception.scheduleId == null) continue;
 
-      if (exception.status == 'declined') {
-        cancelledIds.add(exception.scheduleId!);
+      // Проверяем, относится ли исключение к этой дате
+      final bool isThisDateAffected =
+          exception.date != null &&
+              exception.date!.year == date.year &&
+              exception.date!.month == date.month &&
+              exception.date!.day == date.day;
+
+      // Для declined: смотрим на поле new_day (дата отмены)
+      final bool isDeclinedOnThisDate =
+          exception.status == 'declined' &&
+              exception.newDate != null &&  // ← здесь new_day из твоей схемы
+              exception.newDate!.year == date.year &&
+              exception.newDate!.month == date.month &&
+              exception.newDate!.day == date.day;
+
+      if (isDeclinedOnThisDate) {
+        cancelledOnThisDate.add(exception.scheduleId!);
       }
 
+      // Для replaced: как раньше
       if (exception.status == 'replaced') {
         WeeklyLesson? originalLesson = _weeklyLessons.firstWhere(
               (lesson) => lesson.id == exception.scheduleId,
@@ -441,13 +457,12 @@ class _CalendarPageState extends State<CalendarPage> {
 
         if (originalLesson.id == -1) continue;
 
-        if (exception.date != null &&
-            exception.date!.year == date.year &&
-            exception.date!.month == date.month &&
-            exception.date!.day == date.day) {
-          movedFromThisDayIds.add(exception.scheduleId!);
+        // Перенесено С этой даты
+        if (isThisDateAffected) {
+          movedFromThisDay.add(exception.scheduleId!);
         }
 
+        // Перенесено НА эту дату
         if (exception.newDate != null &&
             exception.newDate!.year == date.year &&
             exception.newDate!.month == date.month &&
@@ -465,21 +480,26 @@ class _CalendarPageState extends State<CalendarPage> {
       }
     }
 
-    // 2. Добавляем перенесенные занятия НА эту дату
+    // 2. Добавляем перенесённые занятия НА эту дату
     result.addAll(movedToThisDate.values);
 
-    // 3. Добавляем обычные уроки для этого дня недели
+    // 3. Добавляем регулярные занятия этого дня недели
     for (var lesson in _weeklyLessons) {
       if (lesson.dayOfWeek == dayOfWeek) {
-        if (cancelledIds.contains(lesson.id)) continue;
-        if (movedFromThisDayIds.contains(lesson.id)) continue;
+        // Пропускаем, если отменено именно на эту дату
+        if (cancelledOnThisDate.contains(lesson.id)) continue;
+
+        // Пропускаем, если перенесено с этой даты
+        if (movedFromThisDay.contains(lesson.id)) continue;
+
+        // Пропускаем, если уже добавлено как перенесённое
         if (movedToThisDate.containsKey(lesson.id)) continue;
 
         result.add(lesson);
       }
     }
 
-    // 4. Добавляем одиночные уроки на эту дату
+    // 4. Добавляем одиночные занятия на эту дату
     for (var singleLesson in _singleLessons) {
       if (singleLesson.date.year == date.year &&
           singleLesson.date.month == date.month &&
@@ -488,7 +508,7 @@ class _CalendarPageState extends State<CalendarPage> {
       }
     }
 
-    // Сортируем все уроки по времени начала
+    // Сортируем по времени
     result.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
 
     return result;
@@ -496,21 +516,27 @@ class _CalendarPageState extends State<CalendarPage> {
 
   ScheduleException? _getExceptionForWeeklyLesson(WeeklyLesson lesson, DateTime date) {
     for (var exception in _exceptions) {
-      if (exception.scheduleId == lesson.id) {
-        if (exception.status == 'replaced' &&
-            exception.newDate != null &&
-            exception.newDate!.year == date.year &&
-            exception.newDate!.month == date.month &&
-            exception.newDate!.day == date.day &&
-            exception.newStartTime != null &&
-            exception.newStartTime!.hour == lesson.startTime.hour &&
-            exception.newStartTime!.minute == lesson.startTime.minute) {
-          return exception;
-        }
+      if (exception.scheduleId != lesson.id) continue;
 
-        if (exception.status == 'declined') {
-          return exception;
-        }
+      final bool isThisDateAffected =
+          exception.date != null &&
+              exception.date!.isAtSameMomentAs(date);
+
+      final bool isDeclinedOnThisDate =
+          exception.status == 'declined' &&
+              exception.newDate != null &&
+              exception.newDate!.isAtSameMomentAs(date);
+
+      final bool isReplacedOnThisDate =
+          exception.status == 'replaced' &&
+              exception.newDate != null &&
+              exception.newDate!.isAtSameMomentAs(date) &&
+              exception.newStartTime != null &&
+              exception.newStartTime!.hour == lesson.startTime.hour &&
+              exception.newStartTime!.minute == lesson.startTime.minute;
+
+      if (isDeclinedOnThisDate || isReplacedOnThisDate || isThisDateAffected) {
+        return exception;
       }
     }
 
@@ -624,7 +650,7 @@ class _CalendarPageState extends State<CalendarPage> {
       final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
       final endMinutes   = lesson.endTime.hour   * 60 + lesson.endTime.minute;
       final durationMinutes = endMinutes - startMinutes;
-      maxDescLines = (durationMinutes <= 30) ? 1 : 4;
+      maxDescLines = (durationMinutes <= 30) ? 1 : 2;
 
       if (durationMinutes > 0) {
         lessonCost = (durationMinutes / 30) * price30Min;
@@ -720,37 +746,46 @@ class _CalendarPageState extends State<CalendarPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(
-                              child: Text(
-                                studentName,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  studentName,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                  softWrap: true,
                                 ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 10, left: 10),
-                              child:Text(
-                                '${lessonCost.toStringAsFixed(2)} BYN',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green[700],
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${lessonCost.toStringAsFixed(2)} BYN',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green[700],
+                                      ),
+                                      maxLines: 1,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 20,
+                                      color: textColor.withOpacity(0.7),
+                                    ),
+                                  ],
                                 ),
-                                textAlign: TextAlign.end,
-                                overflow: TextOverflow.visible,
-                              ),
+                              ],
                             ),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 20,
-                              color: textColor.withOpacity(0.7),
-                            ),
-
                           ],
                         ),
 

@@ -122,7 +122,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         for (final exception in exceptionsData) {
           _scheduleExceptions.add({
             'id': exception['id'],
-            'schedule_id': scheduleId, // сохраняем ID расписания
+            'schedule_id': scheduleId,
             'status': exception['status'],
             'date': exception['date'] != null
                 ? DateTime.parse(exception['date'] as String)
@@ -183,7 +183,9 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
     if (existingSchedules.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Сначала сохраните расписание (оно должно появиться в базе)'),
+          content: Text(
+            'Сначала сохраните расписание (оно должно появиться в базе)',
+          ),
         ),
       );
       return;
@@ -246,7 +248,8 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
     // Вычисляем сколько дней до нужного дня недели
     int daysUntil = dayOfWeek - now.weekday;
     if (daysUntil <= 0) {
-      daysUntil += 7; // Если день уже прошел на этой неделе, берем следующую неделю
+      daysUntil +=
+          7; // Если день уже прошел на этой неделе, берем следующую неделю
     }
 
     return DateTime(now.year, now.month, now.day + daysUntil);
@@ -282,10 +285,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
                   children: [
                     Text(
                       'Расписание:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.blue[600]),
                     ),
                     Text(
                       '$dayName $start-$end',
@@ -308,10 +308,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               Card(
                 elevation: 3,
                 child: ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: Colors.blue,
-                  ),
+                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
                   title: const Text('Ближайшая дата'),
                   subtitle: Text(formattedSuggestedDate),
                   trailing: const Icon(Icons.check_circle, color: Colors.green),
@@ -330,9 +327,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               // Разделитель "ИЛИ"
               Row(
                 children: [
-                  Expanded(
-                    child: Divider(color: Colors.grey[300]),
-                  ),
+                  Expanded(child: Divider(color: Colors.grey[300])),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
@@ -340,9 +335,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ),
-                  Expanded(
-                    child: Divider(color: Colors.grey[300]),
-                  ),
+                  Expanded(child: Divider(color: Colors.grey[300])),
                 ],
               ),
 
@@ -402,9 +395,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Добавлено исключение на $dateWithDay'),
-      ),
+      SnackBar(content: Text('Добавлено исключение на $dateWithDay')),
     );
   }
 
@@ -512,11 +503,16 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         return;
       }
 
-      await supabase.from('student').update({
-        'name': studentName,
-        'description': _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-        'price_30_min': price,
-      }).eq('id', widget.studentId);
+      await supabase
+          .from('student')
+          .update({
+            'name': studentName,
+            'description': _descController.text.trim().isEmpty
+                ? null
+                : _descController.text.trim(),
+            'price_30_min': price,
+          })
+          .eq('id', widget.studentId);
 
       // 1. ОБРАБАТЫВАЕМ РАСПИСАНИЕ
       // Собираем ID расписаний, которые остались
@@ -555,9 +551,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
         if (scheduleId == null) {
           // СОЗДАЕМ НОВОЕ РАСПИСАНИЕ
-          await supabase
-              .from('weekly_schedule')
-              .insert(scheduleData);
+          await supabase.from('weekly_schedule').insert(scheduleData);
         } else {
           // ОБНОВЛЯЕМ СУЩЕСТВУЮЩЕЕ РАСПИСАНИЕ
           await supabase
@@ -599,16 +593,14 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         final lessonData = {
           'student_id': widget.studentId,
           'date':
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
           'start_time': '$start:00',
           'end_time': '$end:00',
         };
 
         if (lessonId == null) {
           // СОЗДАЕМ НОВОЕ ЗАНЯТИЕ
-          await supabase
-              .from('single_lessons')
-              .insert(lessonData);
+          await supabase.from('single_lessons').insert(lessonData);
         } else {
           // ОБНОВЛЯЕМ СУЩЕСТВУЮЩЕЕ ЗАНЯТИЕ
           await supabase
@@ -666,17 +658,27 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         if (exception['date'] != null) {
           final date = exception['date'] as DateTime;
           exceptionData['date'] =
-          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
         }
 
-        if (status == 'replaced') {
+        if (status == 'declined') {
+          // Для отмены: сохраняем оригинальную дату в new_day
+          if (exception['date'] != null) {
+            final originalDate = exception['date'] as DateTime;
+            exceptionData['new_day'] =
+                '${originalDate.year}-${originalDate.month.toString().padLeft(2, '0')}-${originalDate.day.toString().padLeft(2, '0')}';
+          }
+          // Очищаем поля переноса (на всякий случай)
+          exceptionData['new_start_time'] = null;
+          exceptionData['new_end_time'] = null;
+        } else if (status == 'replaced') {
           final newDate = exception['new_date'] as DateTime?;
           final newStart = exception['new_start_time'] as String?;
           final newEnd = exception['new_end_time'] as String?;
 
           if (newDate != null && newStart != null && newEnd != null) {
             exceptionData['new_day'] =
-            '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}';
+                '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}';
             exceptionData['new_start_time'] = '$newStart:00';
             exceptionData['new_end_time'] = '$newEnd:00';
           }
@@ -684,9 +686,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
         if (exceptionId == null) {
           // СОЗДАЕМ НОВОЕ ИСКЛЮЧЕНИЕ
-          await supabase
-              .from('schedule_exceptions')
-              .insert(exceptionData);
+          await supabase.from('schedule_exceptions').insert(exceptionData);
         } else {
           // ОБНОВЛЯЕМ СУЩЕСТВУЮЩЕЕ ИСКЛЮЧЕНИЕ
           await supabase
@@ -705,7 +705,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         context,
         MaterialPageRoute(builder: (context) => const AllStudentScreen()),
       );
-
     } catch (e) {
       print('Ошибка сохранения: $e');
       ScaffoldMessenger.of(
@@ -727,9 +726,9 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   String _getDayName(int dayValue) {
     return _days.firstWhere(
           (d) => d['value'] == dayValue,
-      orElse: () => {'name': ''},
-    )['name']
-    as String;
+          orElse: () => {'name': ''},
+        )['name']
+        as String;
   }
 
   String _formatDate(DateTime date) {
@@ -738,12 +737,27 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
   String _formatDateFull(DateTime date) {
     final weekdayNames = [
-      'Понедельник', 'Вторник', 'Среда',
-      'Четверг', 'Пятница', 'Суббота', 'Воскресенье'
+      'Понедельник',
+      'Вторник',
+      'Среда',
+      'Четверг',
+      'Пятница',
+      'Суббота',
+      'Воскресенье',
     ];
     final monthNames = [
-      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+      'января',
+      'февраля',
+      'марта',
+      'апреля',
+      'мая',
+      'июня',
+      'июля',
+      'августа',
+      'сентября',
+      'октября',
+      'ноября',
+      'декабря',
     ];
 
     final weekday = weekdayNames[date.weekday - 1];
@@ -757,7 +771,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
     try {
       final schedule = _schedule.firstWhere(
-            (s) => s['id'] == scheduleId,
+        (s) => s['id'] == scheduleId,
         orElse: () => {'day': 0, 'start': '--:--', 'end': '--:--'},
       );
       final dayName = _getDayName(schedule['day'] as int);
@@ -830,664 +844,151 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
       body: _isLoading && !_isInitialized
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              // Имя
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Имя ученика',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) =>
-                v?.trim().isEmpty ?? true ? 'Обязательно' : null,
-              ),
-              const SizedBox(height: 20),
-
-              // Описание
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(
-                  labelText: 'Описание / заметки',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 20),
-
-              // Цена
-              TextFormField(
-                controller: _costController,
-                decoration: const InputDecoration(
-                  labelText: 'Цена за 30 минут',
-                  border: OutlineInputBorder(),
-                  prefixText: 'BYN ',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Обязательно';
-                  }
-                  final cleaned = value.trim().replaceAll(' ', '').replaceAll(',', '.');
-                  final numValue = double.tryParse(cleaned);
-                  if (numValue == null || numValue <= 0) {
-                    return 'Введите корректную цену > 0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Расписание
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Расписание',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  children: [
+                    // Имя
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Имя ученика',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          v?.trim().isEmpty ?? true ? 'Обязательно' : null,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add_circle,
-                      color: Colors.green,
-                      size: 32,
+                    const SizedBox(height: 20),
+
+                    // Описание
+                    TextFormField(
+                      controller: _descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Описание / заметки',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 3,
                     ),
-                    onPressed: _addScheduleRow,
-                    tooltip: 'Добавить день',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                    const SizedBox(height: 20),
 
-              if (_schedule.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Нажмите + чтобы добавить день занятия',
-                      style: TextStyle(color: Colors.grey),
+                    // Цена
+                    TextFormField(
+                      controller: _costController,
+                      decoration: const InputDecoration(
+                        labelText: 'Цена за 30 минут',
+                        border: OutlineInputBorder(),
+                        prefixText: 'BYN ',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Обязательно';
+                        }
+                        final cleaned = value
+                            .trim()
+                            .replaceAll(' ', '')
+                            .replaceAll(',', '.');
+                        final numValue = double.tryParse(cleaned);
+                        if (numValue == null || numValue <= 0) {
+                          return 'Введите корректную цену > 0';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 20),
 
-              // Карточки расписания
-              ..._schedule.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-
-                final endOptions = item['start'] != null
-                    ? _getEndTimeOptions(item['start'])
-                    : _startTimes;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    // Расписание
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // 1. День недели
-                        SizedBox(
-                          width: 76,
-                          child: DropdownButtonFormField<int>(
-                            value: item['day'] as int?,
-                            decoration: const InputDecoration(
-                              labelText: 'День',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
-                              ),
-                            ),
-                            items: _days.map((d) {
-                              return DropdownMenuItem<int>(
-                                value: d['value'] as int,
-                                child: Text(d['name'] as String),
-                              );
-                            }).toList(),
-                            onChanged: (v) =>
-                                setState(() => item['day'] = v),
-                            validator: (v) =>
-                            v == null ? 'Выберите день' : null,
+                        const Text(
+                          'Расписание',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-
-                        const SizedBox(width: 8),
-
-                        // 2. Время начала
-                        Expanded(
-                          flex: 7,
-                          child: DropdownButtonFormField<String>(
-                            value: item['start'],
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Начало',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
-                              ),
-                            ),
-                            items: _startTimes.map((t) {
-                              return DropdownMenuItem(
-                                value: t,
-                                child: Text(t),
-                              );
-                            }).toList(),
-                            onChanged: (v) => setState(() {
-                              item['start'] = v;
-                              item['end'] = null;
-                            }),
-                            validator: (v) =>
-                            v == null ? 'Обязательно' : null,
+                        IconButton(
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: Colors.green,
+                            size: 32,
                           ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        // 3. Время окончания
-                        Expanded(
-                          flex: 6,
-                          child: IgnorePointer(
-                            ignoring: item['start'] == null,
-                            child: DropdownButtonFormField<String>(
-                              value: item['end'],
-                              isDense: true,
-                              decoration: InputDecoration(
-                                labelText: 'Конец',
-                                border: const OutlineInputBorder(),
-                                contentPadding:
-                                const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 8,
-                                ),
-                                filled: true,
-                              ),
-                              items: endOptions.map((e) {
-                                return DropdownMenuItem<String>(
-                                  value: e,
-                                  child: Text(e),
-                                );
-                              }).toList(),
-                              onChanged: (v) {
-                                setState(() => item['end'] = v);
-                              },
-                              validator: (v) =>
-                              v == null ? 'Обязательно' : null,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        // 4. Кнопка удаления
-                        Expanded(
-                          flex: 2,
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            tooltip: 'Удалить',
-                            onPressed: () => _removeScheduleRow(index),
-                          ),
+                          onPressed: _addScheduleRow,
+                          tooltip: 'Добавить день',
                         ),
                       ],
                     ),
-                  ),
-                );
-              }).toList(),
+                    const SizedBox(height: 12),
 
-              const SizedBox(height: 24),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Отдельные занятия',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add_circle,
-                      color: Colors.orange,
-                      size: 32,
-                    ),
-                    onPressed: _addSingleLessonRow,
-                    tooltip: 'Добавить отдельное занятие',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              if (_singleLessons.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'Нажмите + чтобы добавить отдельное занятие',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ),
-
-              // Карточки отдельных занятий
-              ..._singleLessons.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-
-                final endOptions = item['start'] != null
-                    ? _getEndTimeOptions(item['start'] as String)
-                    : <String>[];
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: Colors.orange[50],
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // 1. Дата
-                        SizedBox(
-                          width: 80,
-                          child: TextFormField(
-                            readOnly: true,
-                            controller: TextEditingController(
-                              text: _formatDate(item['date'] as DateTime),
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Дата',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
-                              ),
-                            ),
-                            onTap: () async {
-                              final selectedDate = await showDatePicker(
-                                context: context,
-                                initialDate: item['date'] as DateTime,
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime(2100),
-                                locale: const Locale('ru', 'RU'),
-                              );
-                              if (selectedDate != null) {
-                                setState(() {
-                                  item['date'] = selectedDate;
-                                });
-                              }
-                            },
-                            validator: (v) => v == null || v.isEmpty
-                                ? 'Выберите дату'
-                                : null,
+                    if (_schedule.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            'Нажмите + чтобы добавить день занятия',
+                            style: TextStyle(color: Colors.grey),
                           ),
                         ),
+                      ),
 
-                        const SizedBox(width: 8),
+                    // Карточки расписания
+                    ..._schedule.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
 
-                        // 2. Время начала
-                        Expanded(
-                          flex: 6,
-                          child: DropdownButtonFormField<String>(
-                            value: item['start'],
-                            isDense: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Начало',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
-                              ),
-                            ),
-                            items: _startTimes.map((t) {
-                              return DropdownMenuItem(
-                                value: t,
-                                child: Text(t),
-                              );
-                            }).toList(),
-                            onChanged: (v) => setState(() {
-                              item['start'] = v;
-                              item['end'] = null;
-                            }),
-                            validator: (v) =>
-                            v == null ? 'Обязательно' : null,
-                          ),
-                        ),
+                      final endOptions = item['start'] != null
+                          ? _getEndTimeOptions(item['start'])
+                          : _startTimes;
 
-                        const SizedBox(width: 8),
-
-                        // 3. Время окончания
-                        Expanded(
-                          flex: 6,
-                          child: IgnorePointer(
-                            ignoring: item['start'] == null,
-                            child: DropdownButtonFormField<String>(
-                              value: item['end'],
-                              isDense: true,
-                              decoration: InputDecoration(
-                                labelText: 'Конец',
-                                border: const OutlineInputBorder(),
-                                contentPadding:
-                                const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 8,
-                                ),
-                                filled: item['start'] == null,
-                              ),
-                              items: endOptions.map((e) {
-                                return DropdownMenuItem<String>(
-                                  value: e,
-                                  child: Text(e),
-                                );
-                              }).toList(),
-                              onChanged: (v) {
-                                setState(() => item['end'] = v);
-                              },
-                              validator: (v) =>
-                              v == null ? 'Обязательно' : null,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        // 4. Кнопка удаления
-                        Expanded(
-                          flex: 2,
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            tooltip: 'Удалить занятие',
-                            onPressed: () =>
-                                _removeSingleLessonRow(index),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-
-              // Раздел "Исключения в расписании"
-              const SizedBox(height: 24),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Исключения в расписании',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add_circle,
-                      color: Colors.purple,
-                      size: 32,
-                    ),
-                    onPressed: _addScheduleExceptionRow,
-                    tooltip: 'Добавить исключение',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              if (_scheduleExceptions.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 20,
-                    ),
-                    child: Text(
-                      'Нажмите + чтобы добавить исключение (отмена/перенос занятия)',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ),
-
-              // Карточки исключений
-              ..._scheduleExceptions.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                final isReplaced = item['status'] == 'replaced';
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: isReplaced ? Colors.purple[50] : Colors.red[50],
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      children: [
-                        // ИНФОРМАЦИЯ О РАСПИСАНИИ
-                        if (item['schedule_id'] != null && item['original_date'] != null)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue[100]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  size: 16,
-                                  color: Colors.blue[800],
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Исключение для расписания:',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.blue[600],
-                                        ),
-                                      ),
-                                      RichText(
-                                        text: TextSpan(
-                                          children: [
-                                            TextSpan(
-                                              text: _getScheduleInfo(item['schedule_id']), // "ПН 10:00-11:00"
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.blue[800],
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: ' на ',
-                                              style: TextStyle(
-                                                color: Colors.blue[800],
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: _formatDate(item['original_date'] as DateTime), // "15.01"
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.green[800],
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // 1. Статус
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: item['status'] as String,
-                                decoration: const InputDecoration(
-                                  labelText: 'Статус',
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                items: [
-                                  DropdownMenuItem(
-                                    value: 'declined',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.cancel,
-                                          color: Colors.red,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Text('Отменено'),
-                                      ],
-                                    ),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'replaced',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.schedule,
-                                          color: Colors.purple,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Text('Перенесено'),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (v) {
-                                  setState(() {
-                                    item['status'] = v;
-                                    if (v == 'declined') {
-                                      item['new_date'] = null;
-                                      item['new_start_time'] = null;
-                                      item['new_end_time'] = null;
-                                    } else if (v == 'replaced') {
-                                      item['new_date'] = DateTime.now();
-                                    }
-                                  });
-                                },
-                                validator: (v) =>
-                                v == null ? 'Выберите статус' : null,
-                              ),
-                            ),
-
-                            const SizedBox(width: 8),
-
-                            // 2. Кнопка удаления
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
-                              ),
-                              tooltip: 'Удалить исключение',
-                              onPressed: () =>
-                                  _removeScheduleExceptionRow(index),
-                            ),
-                          ],
-                        ),
-
-                        // Поля для переноса
-                        if (isReplaced) ...[
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Новое время занятия:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          Row(
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              // Новая дата
-                              Expanded(
-                                child: TextFormField(
-                                  readOnly: true,
-                                  controller: TextEditingController(
-                                    text: item['new_date'] != null
-                                        ? _formatDate(
-                                      item['new_date'] as DateTime,
-                                    )
-                                        : '',
-                                  ),
+                              // 1. День недели
+                              SizedBox(
+                                width: 76,
+                                child: DropdownButtonFormField<int>(
+                                  value: item['day'] as int?,
                                   decoration: const InputDecoration(
-                                    labelText: 'Новая дата',
+                                    labelText: 'День',
                                     border: OutlineInputBorder(),
                                     contentPadding: EdgeInsets.symmetric(
                                       horizontal: 8,
                                       vertical: 8,
                                     ),
                                   ),
-                                  onTap: () async {
-                                    final selectedDate =
-                                    await showDatePicker(
-                                      context: context,
-                                      initialDate:
-                                      item['new_date']
-                                      as DateTime? ??
-                                          DateTime.now(),
-                                      firstDate: DateTime.now(),
-                                      lastDate: DateTime(2100),
-                                      locale: const Locale(
-                                        'ru',
-                                        'RU',
-                                      ),
+                                  items: _days.map((d) {
+                                    return DropdownMenuItem<int>(
+                                      value: d['value'] as int,
+                                      child: Text(d['name'] as String),
                                     );
-                                    if (selectedDate != null) {
-                                      setState(() {
-                                        item['new_date'] = selectedDate;
-                                      });
-                                    }
-                                  },
-                                  validator: isReplaced
-                                      ? (v) => v == null || v.isEmpty
-                                      ? 'Выберите новую дату'
-                                      : null
-                                      : null,
+                                  }).toList(),
+                                  onChanged: (v) =>
+                                      setState(() => item['day'] = v),
+                                  validator: (v) =>
+                                      v == null ? 'Выберите день' : null,
                                 ),
                               ),
 
                               const SizedBox(width: 8),
 
-                              // Новое время начала
+                              // 2. Время начала
                               Expanded(
+                                flex: 7,
                                 child: DropdownButtonFormField<String>(
-                                  value: item['new_start_time'],
+                                  value: item['start'],
+                                  isDense: true,
                                   decoration: const InputDecoration(
-                                    labelText: 'Новое начало',
+                                    labelText: 'Начало',
                                     border: OutlineInputBorder(),
                                     contentPadding: EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -1501,99 +1002,628 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
                                     );
                                   }).toList(),
                                   onChanged: (v) => setState(() {
-                                    item['new_start_time'] = v;
-                                    item['new_end_time'] = null;
+                                    item['start'] = v;
+                                    item['end'] = null;
                                   }),
-                                  validator: isReplaced
-                                      ? (v) => v == null
-                                      ? 'Выберите новое время начала'
-                                      : null
+                                  validator: (v) =>
+                                      v == null ? 'Обязательно' : null,
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              // 3. Время окончания
+                              Expanded(
+                                flex: 6,
+                                child: IgnorePointer(
+                                  ignoring: item['start'] == null,
+                                  child: DropdownButtonFormField<String>(
+                                    value: item['end'],
+                                    isDense: true,
+                                    decoration: InputDecoration(
+                                      labelText: 'Конец',
+                                      border: const OutlineInputBorder(),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                      filled: true,
+                                    ),
+                                    items: endOptions.map((e) {
+                                      return DropdownMenuItem<String>(
+                                        value: e,
+                                        child: Text(e),
+                                      );
+                                    }).toList(),
+                                    onChanged: (v) {
+                                      setState(() => item['end'] = v);
+                                    },
+                                    validator: (v) =>
+                                        v == null ? 'Обязательно' : null,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              // 4. Кнопка удаления
+                              Expanded(
+                                flex: 2,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'Удалить',
+                                  onPressed: () => _removeScheduleRow(index),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Отдельные занятия',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: Colors.orange,
+                            size: 32,
+                          ),
+                          onPressed: _addSingleLessonRow,
+                          tooltip: 'Добавить отдельное занятие',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (_singleLessons.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            'Нажмите + чтобы добавить отдельное занятие',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      ),
+
+                    // Карточки отдельных занятий
+                    ..._singleLessons.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+
+                      final endOptions = item['start'] != null
+                          ? _getEndTimeOptions(item['start'] as String)
+                          : <String>[];
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.orange[50],
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // 1. Дата
+                              SizedBox(
+                                width: 80,
+                                child: TextFormField(
+                                  readOnly: true,
+                                  controller: TextEditingController(
+                                    text: _formatDate(item['date'] as DateTime),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Дата',
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  onTap: () async {
+                                    final selectedDate = await showDatePicker(
+                                      context: context,
+                                      initialDate: item['date'] as DateTime,
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime(2100),
+                                      locale: const Locale('ru', 'RU'),
+                                    );
+                                    if (selectedDate != null) {
+                                      setState(() {
+                                        item['date'] = selectedDate;
+                                      });
+                                    }
+                                  },
+                                  validator: (v) => v == null || v.isEmpty
+                                      ? 'Выберите дату'
                                       : null,
                                 ),
                               ),
 
                               const SizedBox(width: 8),
 
-                              // Новое время окончания
+                              // 2. Время начала
                               Expanded(
+                                flex: 6,
+                                child: DropdownButtonFormField<String>(
+                                  value: item['start'],
+                                  isDense: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Начало',
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  items: _startTimes.map((t) {
+                                    return DropdownMenuItem(
+                                      value: t,
+                                      child: Text(t),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) => setState(() {
+                                    item['start'] = v;
+                                    item['end'] = null;
+                                  }),
+                                  validator: (v) =>
+                                      v == null ? 'Обязательно' : null,
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              // 3. Время окончания
+                              Expanded(
+                                flex: 6,
                                 child: IgnorePointer(
-                                  ignoring:
-                                  item['new_start_time'] == null,
+                                  ignoring: item['start'] == null,
                                   child: DropdownButtonFormField<String>(
-                                    value: item['new_end_time'],
+                                    value: item['end'],
+                                    isDense: true,
                                     decoration: InputDecoration(
-                                      labelText: 'Новый конец',
+                                      labelText: 'Конец',
                                       border: const OutlineInputBorder(),
                                       contentPadding:
-                                      const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 8,
-                                      ),
-                                      filled:
-                                      item['new_start_time'] == null,
-                                    ),
-                                    items: item['new_start_time'] != null
-                                        ? _getEndTimeOptions(
-                                      item['new_start_time']
-                                      as String,
-                                    )
-                                        .map(
-                                          (e) =>
-                                          DropdownMenuItem<
-                                              String
-                                          >(
-                                            value: e,
-                                            child: Text(e),
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
                                           ),
-                                    )
-                                        .toList()
-                                        : [],
-                                    onChanged: (v) => setState(
-                                          () => item['new_end_time'] = v,
+                                      filled: item['start'] == null,
                                     ),
-                                    validator: isReplaced
-                                        ? (v) => v == null
-                                        ? 'Выберите новое время окончания'
-                                        : null
-                                        : null,
+                                    items: endOptions.map((e) {
+                                      return DropdownMenuItem<String>(
+                                        value: e,
+                                        child: Text(e),
+                                      );
+                                    }).toList(),
+                                    onChanged: (v) {
+                                      setState(() => item['end'] = v);
+                                    },
+                                    validator: (v) =>
+                                        v == null ? 'Обязательно' : null,
                                   ),
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              // 4. Кнопка удаления
+                              Expanded(
+                                flex: 2,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'Удалить занятие',
+                                  onPressed: () =>
+                                      _removeSingleLessonRow(index),
                                 ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                      );
+                    }).toList(),
+
+                    // Раздел "Исключения в расписании"
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Исключения в расписании',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.add_circle,
+                            color: Colors.purple,
+                            size: 32,
+                          ),
+                          onPressed: _addScheduleExceptionRow,
+                          tooltip: 'Добавить исключение',
+                        ),
                       ],
                     ),
-                  ),
-                );
-              }).toList(),
+                    const SizedBox(height: 12),
 
-              const SizedBox(height: 32),
+                    if (_scheduleExceptions.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          child: Text(
+                            'Нажмите + чтобы добавить исключение (отмена/перенос занятия)',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      ),
 
-              // Кнопка сохранения
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : _saveAll,
-                icon: _isLoading
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                  ),
-                )
-                    : const Icon(Icons.save),
-                label: Text(
-                  _isLoading ? 'Сохранение...' : 'Сохранить изменения',
-                ),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  minimumSize: const Size(double.infinity, 56),
+                    // Карточки исключений
+                    ..._scheduleExceptions.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      final isReplaced = item['status'] == 'replaced';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: isReplaced ? Colors.purple[50] : Colors.red[50],
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              // ИНФОРМАЦИЯ О РАСПИСАНИИ
+                              if (item['schedule_id'] != null &&
+                                  item['original_date'] != null)
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.blue[100]!,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today,
+                                        size: 16,
+                                        color: Colors.blue[800],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Исключение для расписания:',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.blue[600],
+                                              ),
+                                            ),
+                                            RichText(
+                                              text: TextSpan(
+                                                children: [
+                                                  TextSpan(
+                                                    text: _getScheduleInfo(
+                                                      item['schedule_id'],
+                                                    ), // "ПН 10:00-11:00"
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.blue[800],
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text: ' с ',
+                                                    style: TextStyle(
+                                                      color: Colors.blue[800],
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text: _formatDate(
+                                                      item['original_date']
+                                                          as DateTime,
+                                                    ), // "15.01"
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.green[800],
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // 1. Статус
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: item['status'] as String,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Статус',
+                                        border: OutlineInputBorder(),
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: 'declined',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.cancel,
+                                                color: Colors.red,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Отменено'),
+                                            ],
+                                          ),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'replaced',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.schedule,
+                                                color: Colors.purple,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Перенесено'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      onChanged: (v) {
+                                        setState(() {
+                                          item['status'] = v;
+                                          if (v == 'declined') {
+                                            item['new_date'] = null;
+                                            item['new_start_time'] = null;
+                                            item['new_end_time'] = null;
+                                          } else if (v == 'replaced') {
+                                            item['new_date'] = DateTime.now();
+                                          }
+                                        });
+                                      },
+                                      validator: (v) =>
+                                          v == null ? 'Выберите статус' : null,
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 8),
+
+                                  // 2. Кнопка удаления
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                    ),
+                                    tooltip: 'Удалить исключение',
+                                    onPressed: () =>
+                                        _removeScheduleExceptionRow(index),
+                                  ),
+                                ],
+                              ),
+
+                              // Поля для переноса
+                              if (isReplaced) ...[
+                                const SizedBox(height: 12),
+                                const Divider(height: 1),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Новое время занятия:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.purple,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                Row(
+                                  children: [
+                                    // Новая дата
+                                    Expanded(
+                                      child: TextFormField(
+                                        readOnly: true,
+                                        controller: TextEditingController(
+                                          text: item['new_date'] != null
+                                              ? _formatDate(
+                                                  item['new_date'] as DateTime,
+                                                )
+                                              : '',
+                                        ),
+                                        decoration: const InputDecoration(
+                                          labelText: 'Новая дата',
+                                          border: OutlineInputBorder(),
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        onTap: () async {
+                                          final selectedDate =
+                                              await showDatePicker(
+                                                context: context,
+                                                initialDate:
+                                                    item['new_date']
+                                                        as DateTime? ??
+                                                    DateTime.now(),
+                                                firstDate: DateTime.now(),
+                                                lastDate: DateTime(2100),
+                                                locale: const Locale(
+                                                  'ru',
+                                                  'RU',
+                                                ),
+                                              );
+                                          if (selectedDate != null) {
+                                            setState(() {
+                                              item['new_date'] = selectedDate;
+                                            });
+                                          }
+                                        },
+                                        validator: isReplaced
+                                            ? (v) => v == null || v.isEmpty
+                                                  ? 'Выберите новую дату'
+                                                  : null
+                                            : null,
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 8),
+
+                                    // Новое время начала
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        value: item['new_start_time'],
+                                        decoration: const InputDecoration(
+                                          labelText: 'Новое начало',
+                                          border: OutlineInputBorder(),
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        items: _startTimes.map((t) {
+                                          return DropdownMenuItem(
+                                            value: t,
+                                            child: Text(t),
+                                          );
+                                        }).toList(),
+                                        onChanged: (v) => setState(() {
+                                          item['new_start_time'] = v;
+                                          item['new_end_time'] = null;
+                                        }),
+                                        validator: isReplaced
+                                            ? (v) => v == null
+                                                  ? 'Выберите новое время начала'
+                                                  : null
+                                            : null,
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 8),
+
+                                    // Новое время окончания
+                                    Expanded(
+                                      child: IgnorePointer(
+                                        ignoring:
+                                            item['new_start_time'] == null,
+                                        child: DropdownButtonFormField<String>(
+                                          value: item['new_end_time'],
+                                          decoration: InputDecoration(
+                                            labelText: 'Новый конец',
+                                            border: const OutlineInputBorder(),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 8,
+                                                ),
+                                            filled:
+                                                item['new_start_time'] == null,
+                                          ),
+                                          items: item['new_start_time'] != null
+                                              ? _getEndTimeOptions(
+                                                      item['new_start_time']
+                                                          as String,
+                                                    )
+                                                    .map(
+                                                      (e) =>
+                                                          DropdownMenuItem<
+                                                            String
+                                                          >(
+                                                            value: e,
+                                                            child: Text(e),
+                                                          ),
+                                                    )
+                                                    .toList()
+                                              : [],
+                                          onChanged: (v) => setState(
+                                            () => item['new_end_time'] = v,
+                                          ),
+                                          validator: isReplaced
+                                              ? (v) => v == null
+                                                    ? 'Выберите новое время окончания'
+                                                    : null
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+
+                    const SizedBox(height: 32),
+
+                    // Кнопка сохранения
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _saveAll,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(
+                        _isLoading ? 'Сохранение...' : 'Сохранить изменения',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        minimumSize: const Size(double.infinity, 56),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
