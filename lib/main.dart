@@ -67,18 +67,11 @@ class Student {
       id: json['id'],
       name: json['name'],
       description: json['description'],
-      price30Min: json['price_30_min'],
+      price30Min: (json['price_30_min'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
-  double calculateLessonCost(TimeOfDay startTime, TimeOfDay endTime) {
-    final startMinutes = startTime.hour * 60 + startTime.minute;
-    final endMinutes = endTime.hour * 60 + endTime.minute;
-    final durationMinutes = endMinutes - startMinutes;
-    if (durationMinutes <= 0) return 0;
 
-    return (durationMinutes / 30) * price30Min.toDouble();
-  }
 }
 
 class BaseLesson {
@@ -376,6 +369,27 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  Future<void> _refreshAllData() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await _loadEssentialData();
+    } catch (e) {
+      print('Ошибка при обновлении: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Не удалось обновить данные: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
   @override
   void dispose() {
     _pageController.dispose();
@@ -551,7 +565,6 @@ class _CalendarPageState extends State<CalendarPage> {
     return groups;
   }
 
-  // Добавьте этот метод в класс _CalendarPageState (например, после _groupOverlappingLessons)
   void _navigateToEditStudent(int studentId, BuildContext context) {
     // Проверяем, есть ли ученик в карте
     if (_studentsMap.containsKey(studentId)) {
@@ -603,13 +616,22 @@ class _CalendarPageState extends State<CalendarPage> {
     final student = _studentsMap[lesson.studentId];
     final studentName = student?.name ?? 'Ученик ${lesson.studentId}';
     final studentDescription = student?.description;
-    final studentPrice = student?.price30Min ?? 0;
+    final double price30Min = student?.price30Min ?? 0.0;
+    int maxDescLines = 0;
 
-    // Рассчитываем стоимость занятия
-    double lessonCost = 0;
-    if (student != null) {
-      lessonCost = student.calculateLessonCost(lesson.startTime, lesson.endTime);
+    double lessonCost = 0.0;
+    if (student != null && price30Min > 0) {
+      final startMinutes = lesson.startTime.hour * 60 + lesson.startTime.minute;
+      final endMinutes   = lesson.endTime.hour   * 60 + lesson.endTime.minute;
+      final durationMinutes = endMinutes - startMinutes;
+      maxDescLines = (durationMinutes <= 30) ? 1 : 4;
+
+      if (durationMinutes > 0) {
+        lessonCost = (durationMinutes / 30) * price30Min;
+      }
     }
+
+
 
     ScheduleException? exception;
     if (lesson is WeeklyLesson) {
@@ -624,26 +646,12 @@ class _CalendarPageState extends State<CalendarPage> {
       leftPercent = index * widthPercent;
     }
 
-    String statusText = '';
-    if (exception != null) {
-      if (exception.status == 'replaced') {
-        statusText = 'Перенесено';
-        if (exception.newDate != null && exception.newStartTime != null) {
-          statusText += '\nна ${exception.newDate!.day}.${exception.newDate!.month} '
-              '${exception.newStartTime!.hour}:${exception.newStartTime!.minute.toString().padLeft(2, '0')}';
-        }
-      } else if (exception.status == 'declined') {
-        statusText = 'Отменено';
-      }
-    }
-
     // Определяем цвета
     Color lessonColor;
     Color borderColor;
     Color textColor;
 
     if (isSingleLesson) {
-      // Для одиночных уроков - ЖЕЛТЫЙ
       lessonColor = Colors.yellow.withOpacity(0.2);
       borderColor = Colors.orange;
       textColor = Colors.orange[800]!;
@@ -712,24 +720,37 @@ class _CalendarPageState extends State<CalendarPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Имя ученика с иконкой перехода
                         Row(
                           children: [
                             Expanded(
                               child: Text(
                                 studentName,
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: textColor,
                                 ),
                               ),
                             ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 10, left: 10),
+                              child:Text(
+                                '${lessonCost.toStringAsFixed(2)} BYN',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green[700],
+                                ),
+                                textAlign: TextAlign.end,
+                                overflow: TextOverflow.visible,
+                              ),
+                            ),
                             Icon(
                               Icons.arrow_forward_ios,
-                              size: 10,
+                              size: 20,
                               color: textColor.withOpacity(0.7),
                             ),
+
                           ],
                         ),
 
@@ -743,129 +764,8 @@ class _CalendarPageState extends State<CalendarPage> {
                                 fontSize: 12,
                                 color: Colors.black87,
                               ),
-                              maxLines: 2,
+                              maxLines: maxDescLines,
                               overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-
-                        // Стоимость занятия
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Стоимость:',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[700],
-                                  ),
-                                  overflow: TextOverflow.visible,
-                                ),
-                              ),
-                              Flexible(
-                                child: Text(
-                                  '${lessonCost.toStringAsFixed(2)} BYN',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green[700],
-                                  ),
-                                  textAlign: TextAlign.end,
-                                  overflow: TextOverflow.visible,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Статус и тип занятия
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 2,
-                            children: [
-                              if (isSingleLesson)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.withOpacity(0.1), // ОРАНЖЕВЫЙ
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'разовое',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      color: Colors.orange[800]!, // ОРАНЖЕВЫЙ
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              if (exception != null && exception.status == 'replaced')
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'перенесено',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      color: Colors.purple,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              if (exception != null && exception.status == 'declined')
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'отменено',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        // Дополнительный текст статуса
-                        if (statusText.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              statusText,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: textColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-
-                        // Подсказка (только для десктопных устройств)
-                        if (Theme.of(context).platform == TargetPlatform.windows ||
-                            Theme.of(context).platform == TargetPlatform.linux ||
-                            Theme.of(context).platform == TargetPlatform.macOS)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Нажмите для редактирования',
-                              style: TextStyle(
-                                fontSize: 7,
-                                color: textColor.withOpacity(0.6),
-                                fontStyle: FontStyle.italic,
-                              ),
                             ),
                           ),
                       ],
@@ -1034,6 +934,11 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _refreshAllData,
+        tooltip: 'Обновить',
+        child: const Icon(Icons.refresh),
       ),
     );
   }
