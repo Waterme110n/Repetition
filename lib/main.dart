@@ -479,7 +479,8 @@ class _CalendarPageState extends State<CalendarPage> {
     final dayOfWeek = _getDayOfWeek(date);
     final result = <BaseLesson>[];
     final now = DateTime.now();
-    final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final isPastOrToday = !date.isAfter(todayMidnight);
 
     // 1. Исключения (отмены и переносы) — применяем всегда
     final cancelledOnThisDate = <int>{};
@@ -572,7 +573,7 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     // 3. Одиночные занятия — РАЗДЕЛЯЕМ по isPast
-    if (isPast) {
+    if (isPastOrToday) {
       // Прошлое: берём из completed_lessons (single + replaced)
       for (var cl in _completedLessons) {
         if (cl.lessonDate.year == date.year &&
