@@ -80,11 +80,14 @@ class BaseLesson {
   final TimeOfDay startTime;
   final TimeOfDay endTime;
 
+  final bool isReplacedFromCompleted;
+
   BaseLesson({
     required this.id,
     required this.studentId,
     required this.startTime,
     required this.endTime,
+    this.isReplacedFromCompleted = false,
   });
 
   int get startMinutes => startTime.hour * 60 + startTime.minute;
@@ -100,11 +103,13 @@ class WeeklyLesson extends BaseLesson {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     required this.dayOfWeek,
+    bool isReplacedFromCompleted = false,
   }) : super(
     id: id,
     studentId: studentId,
     startTime: startTime,
     endTime: endTime,
+    isReplacedFromCompleted: isReplacedFromCompleted,
   );
 
   factory WeeklyLesson.fromJson(Map<String, dynamic> json) {
@@ -161,6 +166,47 @@ class SingleLesson extends BaseLesson {
   }
 
   int get dayOfWeek => date.weekday;
+}
+
+class CompletedLesson {
+  final int id;
+  final int studentId;
+  final int? scheduleId;
+  final DateTime lessonDate;
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
+  final String type; // 'single', 'weekly', 'replaced', 'declined'
+
+  CompletedLesson({
+    required this.id,
+    required this.studentId,
+    this.scheduleId,
+    required this.lessonDate,
+    required this.startTime,
+    required this.endTime,
+    required this.type,
+  });
+
+  factory CompletedLesson.fromJson(Map<String, dynamic> json) {
+    final startParts = (json['start_time'] as String).split(':');
+    final endParts = (json['end_time'] as String).split(':');
+
+    return CompletedLesson(
+      id: json['id'] as int,
+      studentId: json['student_id'] as int,
+      scheduleId: json['schedule_id'] as int?,
+      lessonDate: DateTime.parse(json['lesson_date'] as String),
+      startTime: TimeOfDay(
+        hour: int.parse(startParts[0]),
+        minute: int.parse(startParts[1]),
+      ),
+      endTime: TimeOfDay(
+        hour: int.parse(endParts[0]),
+        minute: int.parse(endParts[1]),
+      ),
+      type: json['type'] as String,
+    );
+  }
 }
 
 class ScheduleException {
@@ -233,6 +279,7 @@ class _CalendarPageState extends State<CalendarPage> {
   List<WeeklyLesson> _weeklyLessons = [];
   List<ScheduleException> _exceptions = [];
   List<SingleLesson> _singleLessons = [];
+  List<CompletedLesson> _completedLessons = [];
   Map<int, Student> _studentsMap = {};
 
   bool _isLoading = true;
@@ -269,6 +316,7 @@ class _CalendarPageState extends State<CalendarPage> {
       _fetchWeeklyLessons(),
       _fetchSingleLessons(),
       _fetchExceptions(),
+      _fetchCompletedLessons(),
     ]);
     setState(() => _isLoading = false);
   }
@@ -369,6 +417,22 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  Future<void> _fetchCompletedLessons() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('completed_lessons')
+          .select();
+
+      if (response is List) {
+        setState(() {
+          _completedLessons = response.map((json) => CompletedLesson.fromJson(json)).toList();
+        });
+      }
+    } catch (e) {
+      print('Error fetching completed lessons: $e');
+    }
+  }
+
   Future<void> _refreshAllData() async {
     setState(() => _isLoading = true);
 
@@ -413,39 +477,36 @@ class _CalendarPageState extends State<CalendarPage> {
 
   List<BaseLesson> _getLessonsForDate(DateTime date) {
     final dayOfWeek = _getDayOfWeek(date);
-    final List<BaseLesson> result = [];
+    final result = <BaseLesson>[];
+    final now = DateTime.now();
+    final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
 
-    // 1. Собираем исключения, которые влияют именно на эту дату
-    final Set<int> cancelledOnThisDate = {};     // scheduleId, отменённые именно на эту дату
-    final Set<int> movedFromThisDay = {};        // scheduleId, которые были перенесены с этой даты
-    final Map<int, BaseLesson> movedToThisDate = {};  // scheduleId → новое занятие на эту дату
+    // 1. Исключения (отмены и переносы) — применяем всегда
+    final cancelledOnThisDate = <int>{};
+    final movedFromThisDay = <int>{};
+    final movedToThisDate = <int, BaseLesson>{};
 
     for (var exception in _exceptions) {
       if (exception.scheduleId == null) continue;
 
-      // Проверяем, относится ли исключение к этой дате
-      final bool isThisDateAffected =
-          exception.date != null &&
-              exception.date!.year == date.year &&
-              exception.date!.month == date.month &&
-              exception.date!.day == date.day;
+      final isThisDateAffected = exception.date != null &&
+          exception.date!.year == date.year &&
+          exception.date!.month == date.month &&
+          exception.date!.day == date.day;
 
-      // Для declined: смотрим на поле new_day (дата отмены)
-      final bool isDeclinedOnThisDate =
-          exception.status == 'declined' &&
-              exception.newDate != null &&  // ← здесь new_day из твоей схемы
-              exception.newDate!.year == date.year &&
-              exception.newDate!.month == date.month &&
-              exception.newDate!.day == date.day;
+      final isDeclinedOnThisDate = exception.status == 'declined' &&
+          exception.newDate != null &&
+          exception.newDate!.year == date.year &&
+          exception.newDate!.month == date.month &&
+          exception.newDate!.day == date.day;
 
       if (isDeclinedOnThisDate) {
         cancelledOnThisDate.add(exception.scheduleId!);
       }
 
-      // Для replaced: как раньше
       if (exception.status == 'replaced') {
-        WeeklyLesson? originalLesson = _weeklyLessons.firstWhere(
-              (lesson) => lesson.id == exception.scheduleId,
+        final original = _weeklyLessons.firstWhere(
+              (l) => l.id == exception.scheduleId,
           orElse: () => WeeklyLesson(
             id: -1,
             studentId: 0,
@@ -455,14 +516,10 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
         );
 
-        if (originalLesson.id == -1) continue;
+        if (original.id == -1) continue;
 
-        // Перенесено С этой даты
-        if (isThisDateAffected) {
-          movedFromThisDay.add(exception.scheduleId!);
-        }
+        if (isThisDateAffected) movedFromThisDay.add(exception.scheduleId!);
 
-        // Перенесено НА эту дату
         if (exception.newDate != null &&
             exception.newDate!.year == date.year &&
             exception.newDate!.month == date.month &&
@@ -470,8 +527,8 @@ class _CalendarPageState extends State<CalendarPage> {
             exception.newStartTime != null &&
             exception.newEndTime != null) {
           movedToThisDate[exception.scheduleId!] = WeeklyLesson(
-            id: originalLesson.id,
-            studentId: originalLesson.studentId,
+            id: original.id,
+            studentId: original.studentId,
             dayOfWeek: exception.newDayOfWeek ?? dayOfWeek,
             startTime: exception.newStartTime!,
             endTime: exception.newEndTime!,
@@ -480,38 +537,110 @@ class _CalendarPageState extends State<CalendarPage> {
       }
     }
 
-    // 2. Добавляем перенесённые занятия НА эту дату
     result.addAll(movedToThisDate.values);
 
-    // 3. Добавляем регулярные занятия этого дня недели
+    // 2. Регулярные занятия
     for (var lesson in _weeklyLessons) {
-      if (lesson.dayOfWeek == dayOfWeek) {
-        // Пропускаем, если отменено именно на эту дату
-        if (cancelledOnThisDate.contains(lesson.id)) continue;
+      if (lesson.dayOfWeek != dayOfWeek) continue;
 
-        // Пропускаем, если перенесено с этой даты
-        if (movedFromThisDay.contains(lesson.id)) continue;
+      CompletedLesson? completed;
+      try {
+        completed = _completedLessons.firstWhere(
+              (c) =>
+          c.scheduleId == lesson.id &&
+              c.lessonDate.year == date.year &&
+              c.lessonDate.month == date.month &&
+              c.lessonDate.day == date.day,
+        );
+      } catch (_) {
+        completed = null;
+      }
 
-        // Пропускаем, если уже добавлено как перенесённое
-        if (movedToThisDate.containsKey(lesson.id)) continue;
+      if (completed != null) {
+        if (completed.type == 'declined') {
+          cancelledOnThisDate.add(lesson.id);
+        } else if (completed.type == 'replaced') {
+          movedFromThisDay.add(lesson.id);
+        }
+      }
 
-        result.add(lesson);
+      if (cancelledOnThisDate.contains(lesson.id)) continue;
+      if (movedFromThisDay.contains(lesson.id)) continue;
+      if (movedToThisDate.containsKey(lesson.id)) continue;
+
+      result.add(lesson);
+    }
+
+    // 3. Одиночные занятия — РАЗДЕЛЯЕМ по isPast
+    if (isPast) {
+      // Прошлое: берём из completed_lessons (single + replaced)
+      for (var cl in _completedLessons) {
+        if (cl.lessonDate.year == date.year &&
+            cl.lessonDate.month == date.month &&
+            cl.lessonDate.day == date.day) {
+          if (cl.type == 'single') {
+            result.add(SingleLesson(
+              id: cl.id,
+              studentId: cl.studentId,
+              startTime: cl.startTime,
+              endTime: cl.endTime,
+              date: cl.lessonDate,
+            ));
+          } else if (cl.type == 'replaced') {
+            WeeklyLesson? originalWeekly;
+            if (cl.scheduleId != null) {
+              try {
+                originalWeekly = _weeklyLessons.firstWhere(
+                      (l) => l.id == cl.scheduleId,
+                );
+              } catch (_) {}
+            }
+
+            if (originalWeekly != null) {
+              result.add(WeeklyLesson(
+                id: originalWeekly.id,
+                studentId: cl.studentId,
+                dayOfWeek: originalWeekly.dayOfWeek,
+                startTime: cl.startTime,
+                endTime: cl.endTime,
+                isReplacedFromCompleted: true,
+              ));
+            } else {
+              result.add(BaseLesson(
+                id: cl.id,
+                studentId: cl.studentId,
+                startTime: cl.startTime,
+                endTime: cl.endTime,
+                isReplacedFromCompleted: true,
+              ));
+            }
+          }
+        }
+      }
+    } else {
+      // Будущее (включая сегодня): берём из single_lessons
+      for (var single in _singleLessons) {
+        if (single.date.year == date.year &&
+            single.date.month == date.month &&
+            single.date.day == date.day) {
+          result.add(single);
+        }
       }
     }
 
-    // 4. Добавляем одиночные занятия на эту дату
-    for (var singleLesson in _singleLessons) {
-      if (singleLesson.date.year == date.year &&
-          singleLesson.date.month == date.month &&
-          singleLesson.date.day == date.day) {
-        result.add(singleLesson);
+    // 4. Удаляем дубликаты (по студенту + времени)
+    final uniqueResult = <BaseLesson>[];
+    final seen = <String>{};
+
+    for (var lesson in result) {
+      final key = '${lesson.studentId}_${lesson.startMinutes}_${lesson.endMinutes}';
+      if (seen.add(key)) {
+        uniqueResult.add(lesson);
       }
     }
 
-    // Сортируем по времени
-    result.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
-
-    return result;
+    uniqueResult.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    return uniqueResult;
   }
 
   ScheduleException? _getExceptionForWeeklyLesson(WeeklyLesson lesson, DateTime date) {
@@ -677,11 +806,18 @@ class _CalendarPageState extends State<CalendarPage> {
     Color borderColor;
     Color textColor;
 
+
     if (isSingleLesson) {
       lessonColor = Colors.yellow.withOpacity(0.2);
       borderColor = Colors.orange;
       textColor = Colors.orange[800]!;
-    } else if (exception != null) {
+    }
+    else if (lesson.isReplacedFromCompleted || (lesson is WeeklyLesson && _getExceptionForWeeklyLesson(lesson, date)?.status == 'replaced')) {
+      lessonColor = Colors.purple.withOpacity(0.2);
+      borderColor = Colors.purple;
+      textColor = Colors.purple;
+    }
+    else if (exception != null) {
       switch (exception.status) {
         case 'replaced':
           lessonColor = Colors.purple.withOpacity(0.2);
@@ -698,7 +834,8 @@ class _CalendarPageState extends State<CalendarPage> {
           borderColor = Colors.pinkAccent;
           textColor = Colors.pinkAccent;
       }
-    } else {
+    }
+    else {
       lessonColor = Colors.pinkAccent.withOpacity(0.2);
       borderColor = Colors.pinkAccent;
       textColor = Colors.pinkAccent;
