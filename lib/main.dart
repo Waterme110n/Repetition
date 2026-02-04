@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:for_repets/all_student.dart';
+import 'package:for_repets/statistics_page.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_student.dart';
@@ -1000,6 +1001,17 @@ class _CalendarPageState extends State<CalendarPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AddStudentScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.show_chart),
+              title: const Text('Статистика'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StatisticsPage()),
                 );
               },
             ),

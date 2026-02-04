@@ -1,5 +1,6 @@
 // lib/screens/edit_student_screen.dart
 import 'package:flutter/material.dart';
+import 'package:for_repets/statistics_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'all_student.dart';
 import 'main.dart';
@@ -836,6 +837,17 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               title: const Text('Добавить ученика'),
               onTap: () {
                 Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.show_chart),
+              title: const Text('Статистика'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StatisticsPage()),
+                );
               },
             ),
           ],
