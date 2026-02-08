@@ -12,5 +12,22 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDbG2ALCKk7gweOR4cgZmD8ZtFkh4fWYk8",
+      authDomain: "repets-9c3ba.firebaseapp.com",
+      projectId: "repets-9c3ba",
+      storageBucket: "repets-9c3ba.firebasestorage.app",
+      messagingSenderId: "634814389919",
+      appId: "1:634814389919:web:1d7bdcd97380562f6e8caa",
+      measurementId: "G-W1VV2ZH19N"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+  </script>
 </body>
 </html>
