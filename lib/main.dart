@@ -482,7 +482,19 @@ class _CalendarPageState extends State<CalendarPage> {
     final now = DateTime.now();
     final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
 
-    // 1. Исключения (отмены и переносы) — применяем всегда
+    // 1. СОБИРАЕМ ВСЕ ПЕРЕНЕСЕННЫЕ ЗАНЯТИЯ ИЗ completed_lessons
+    final replacedFromCompleted = <int, CompletedLesson>{};
+    final declinedFromCompleted = <int>{};
+
+    for (var completed in _completedLessons) {
+      if (completed.type == 'replaced' && completed.scheduleId != null) {
+        replacedFromCompleted[completed.scheduleId!] = completed;
+      } else if (completed.type == 'declined' && completed.scheduleId != null) {
+        declinedFromCompleted.add(completed.scheduleId!);
+      }
+    }
+
+    // 2. Исключения (отмены и переносы)
     final cancelledOnThisDate = <int>{};
     final movedFromThisDay = <int>{};
     final movedToThisDate = <int, BaseLesson>{};
@@ -538,11 +550,23 @@ class _CalendarPageState extends State<CalendarPage> {
       }
     }
 
-    result.addAll(movedToThisDate.values);
-
-    // 2. Регулярные занятия
+    // 3. Регулярные занятия (НЕ добавляем если они были перенесены)
     for (var lesson in _weeklyLessons) {
       if (lesson.dayOfWeek != dayOfWeek) continue;
+
+      // Проверяем, был ли этот урок перенесен через completed_lessons
+      final completedReplaced = replacedFromCompleted[lesson.id];
+      if (completedReplaced != null) {
+        // Этот урок был перенесен, добавляем его ТОЛЬКО в новую дату
+        movedFromThisDay.add(lesson.id);
+        continue;
+      }
+
+      // Проверяем, был ли этот урок отменен через completed_lessons
+      if (declinedFromCompleted.contains(lesson.id)) {
+        cancelledOnThisDate.add(lesson.id);
+        continue;
+      }
 
       CompletedLesson? completed;
       try {
@@ -572,7 +596,7 @@ class _CalendarPageState extends State<CalendarPage> {
       result.add(lesson);
     }
 
-    // 3. Одиночные занятия — РАЗДЕЛЯЕМ по isPast
+    // 4. Одиночные занятия — РАЗДЕЛЯЕМ по isPast
     if (isPast) {
       // Прошлое: берём из completed_lessons (single + replaced)
       for (var cl in _completedLessons) {
@@ -588,33 +612,36 @@ class _CalendarPageState extends State<CalendarPage> {
               date: cl.lessonDate,
             ));
           } else if (cl.type == 'replaced') {
-            WeeklyLesson? originalWeekly;
-            if (cl.scheduleId != null) {
-              try {
-                originalWeekly = _weeklyLessons.firstWhere(
-                      (l) => l.id == cl.scheduleId,
-                );
-              } catch (_) {}
-            }
+            // НЕ добавляем здесь, так как уже обработали выше в movedToThisDate
+          }
+        }
+      }
 
-            if (originalWeekly != null) {
-              result.add(WeeklyLesson(
-                id: originalWeekly.id,
-                studentId: cl.studentId,
-                dayOfWeek: originalWeekly.dayOfWeek,
-                startTime: cl.startTime,
-                endTime: cl.endTime,
-                isReplacedFromCompleted: true,
-              ));
-            } else {
-              result.add(BaseLesson(
-                id: cl.id,
-                studentId: cl.studentId,
-                startTime: cl.startTime,
-                endTime: cl.endTime,
-                isReplacedFromCompleted: true,
-              ));
-            }
+      // Добавляем перенесенные занятия в новую дату
+      for (var cl in _completedLessons) {
+        if (cl.type == 'replaced' &&
+            cl.lessonDate.year == date.year &&
+            cl.lessonDate.month == date.month &&
+            cl.lessonDate.day == date.day) {
+
+          WeeklyLesson? originalWeekly;
+          if (cl.scheduleId != null) {
+            try {
+              originalWeekly = _weeklyLessons.firstWhere(
+                    (l) => l.id == cl.scheduleId,
+              );
+            } catch (_) {}
+          }
+
+          if (originalWeekly != null) {
+            result.add(WeeklyLesson(
+              id: originalWeekly.id,
+              studentId: cl.studentId,
+              dayOfWeek: originalWeekly.dayOfWeek,
+              startTime: cl.startTime,
+              endTime: cl.endTime,
+              isReplacedFromCompleted: true,
+            ));
           }
         }
       }
@@ -627,9 +654,12 @@ class _CalendarPageState extends State<CalendarPage> {
           result.add(single);
         }
       }
+
+      // Добавляем перенесенные занятия из schedule_exceptions
+      result.addAll(movedToThisDate.values);
     }
 
-    // 4. Удаляем дубликаты (по студенту + времени)
+    // 5. Удаляем дубликаты (по студенту + времени)
     final uniqueResult = <BaseLesson>[];
     final seen = <String>{};
 
